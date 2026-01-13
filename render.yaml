@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: azlan-autos-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_VERSION
+        value: "1.0.0"
