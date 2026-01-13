@@ -60,11 +60,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Render health check endpoint
-app.get('/healthz', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
@@ -83,6 +78,11 @@ app.get('/', (req, res) => {
       appVersion: '/api/app-version',
     }
   });
+});
+
+// Render health check endpoint (MUST be before error handlers)
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 // Error Handlers
