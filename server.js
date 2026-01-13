@@ -60,6 +60,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Render health check endpoint
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
