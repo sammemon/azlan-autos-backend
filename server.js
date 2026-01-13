@@ -11,6 +11,9 @@ const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 // Initialize Express
 const app = express();
 
+// ✅ REQUIRED for Render / reverse proxy environments
+app.set('trust proxy', 1);
+
 // Connect to MongoDB
 connectDB();
 
