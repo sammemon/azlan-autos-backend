@@ -2,6 +2,7 @@ const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const crypto = require('crypto');
+const { sendVerificationEmail } = require('../utils/emailService');
 
 // @desc    Public signup
 // @route   POST /api/auth/signup
@@ -31,15 +32,21 @@ exports.signup = async (req, res, next) => {
       isEmailVerified: false,
     });
 
-    // TODO: Send verification email
-    // For now, we'll just return the token in response (in production, send via email)
-    // const verificationLink = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
-    // await sendVerificationEmail(user.email, verificationLink);
+    try {
+      await sendVerificationEmail(user.email, verificationToken, req);
+    } catch (emailErr) {
+      return errorResponse(
+        res,
+        500,
+        'Account created but failed to send verification email. Please contact support.',
+      );
+    }
 
-    successResponse(res, 201, 'Account created successfully. Please check your email to verify your account.', {
-      email: user.email,
-      verificationToken, // Remove this in production, only for testing
-    });
+    successResponse(
+      res,
+      201,
+      'Account created successfully. Please check your email to verify your account.',
+    );
   } catch (error) {
     next(error);
   }
@@ -96,13 +103,13 @@ exports.resendVerification = async (req, res, next) => {
     user.emailVerificationExpires = tokenExpiry;
     await user.save();
 
-    // TODO: Send verification email
-    // const verificationLink = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
-    // await sendVerificationEmail(user.email, verificationLink);
+    try {
+      await sendVerificationEmail(user.email, verificationToken, req);
+    } catch (emailErr) {
+      return errorResponse(res, 500, 'Could not send verification email');
+    }
 
-    successResponse(res, 200, 'Verification email sent successfully', {
-      verificationToken, // Remove this in production
-    });
+    successResponse(res, 200, 'Verification email sent successfully');
   } catch (error) {
     next(error);
   }
