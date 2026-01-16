@@ -10,7 +10,32 @@ const {
   updatePassword,
   getAllUsers,
   updateUserStatus,
+  signup,
+  verifyEmail,
+  resendVerification,
 } = require('../controllers/authController');
+
+router.post(
+  '/signup',
+  [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  validateRequest,
+  signup
+);
+
+router.get('/verify-email/:token', verifyEmail);
+
+router.post(
+  '/resend-verification',
+  [
+    body('email').isEmail().withMessage('Valid email is required'),
+  ],
+  validateRequest,
+  resendVerification
+);
 
 router.post(
   '/register',
