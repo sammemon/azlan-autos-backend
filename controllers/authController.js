@@ -3,6 +3,10 @@ const generateToken = require('../utils/generateToken');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const oauthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 // @desc    Public signup
 // @route   POST /api/auth/signup
@@ -112,6 +116,74 @@ exports.resendVerification = async (req, res, next) => {
     successResponse(res, 200, 'Verification email sent successfully');
   } catch (error) {
     next(error);
+  }
+};
+
+// @desc    Google Sign-In
+// @route   POST /api/auth/google
+// @access  Public
+exports.googleAuth = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!oauthClient) {
+      return errorResponse(res, 500, 'Google OAuth not configured');
+    }
+
+    if (!idToken) {
+      return errorResponse(res, 400, 'Missing idToken');
+    }
+
+    // Verify token with Google
+    const ticket = await oauthClient.verifyIdToken({
+      idToken,
+      audience: googleClientId,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload?.email;
+    const name = payload?.name || 'Google User';
+
+    if (!email) {
+      return errorResponse(res, 400, 'Unable to retrieve email from Google');
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create a new verified user
+      const randomPassword = crypto.randomBytes(8).toString('hex');
+      user = await User.create({
+        name,
+        email,
+        password: randomPassword,
+        role: 'cashier',
+        isEmailVerified: true,
+        emailVerificationToken: undefined,
+        emailVerificationExpires: undefined,
+      });
+    } else if (!user.isEmailVerified) {
+      user.isEmailVerified = true;
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save();
+    }
+
+    if (!user.isActive) {
+      return errorResponse(res, 401, 'Account is deactivated');
+    }
+
+    const token = generateToken(user._id);
+
+    successResponse(res, 200, 'Login successful', {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token,
+    });
+  } catch (error) {
+    return errorResponse(res, 400, 'Google authentication failed');
   }
 };
 
