@@ -27,9 +27,7 @@ exports.signup = async (req, res, next) => {
       email,
       password,
       role: 'cashier', // Default role for public signup
-      emailVerificationToken: verificationToken,
-      emailVerificationExpires: tokenExpiry,
-      isEmailVerified: false,
+      isEmailVerified: true, // Auto-verify on signup
     });
 
     try {
@@ -169,11 +167,6 @@ exports.login = async (req, res, next) => {
     // Check if user is active
     if (!user.isActive) {
       return errorResponse(res, 401, 'Account is deactivated');
-    }
-
-    // Check if email is verified
-    if (!user.isEmailVerified) {
-      return errorResponse(res, 401, 'Please verify your email before logging in');
     }
 
     // Check password
