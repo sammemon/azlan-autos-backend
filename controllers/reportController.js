@@ -22,6 +22,7 @@ exports.getDashboardStats = async (req, res, next) => {
     last7Days.setDate(last7Days.getDate() - 7);
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
     // Helper function to calculate sales and profit for a date range
     const calculateStats = async (startDate, endDate = null) => {
@@ -32,14 +33,19 @@ exports.getDashboardStats = async (req, res, next) => {
       
       const stats = await Sale.aggregate([
         { $match: match },
-        { $unwind: '$items' },
         { $group: { 
           _id: null, 
-          totalSales: { $sum: { $multiply: ['$items.sellingPrice', '$items.quantity'] } },
-          profit: { $sum: { $multiply: [
-            { $subtract: ['$items.sellingPrice', { $ifNull: ['$items.purchasePrice', 0] }] },
-            '$items.quantity'
-          ] } }
+          totalSales: { $sum: '$total' },
+          profit: { $sum: { 
+            $reduce: {
+              input: '$items',
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: [
+                { $subtract: ['$$this.sellingPrice', '$$this.purchasePrice'] },
+                '$$this.quantity'
+              ] }] }
+            }
+          } }
         } }
       ]);
       return stats[0] || { totalSales: 0, profit: 0 };
@@ -55,7 +61,7 @@ exports.getDashboardStats = async (req, res, next) => {
     const last7DaysStats = await calculateStats(last7Days, tomorrow);
 
     // This month's sales and profit
-    const monthStats = await calculateStats(startOfMonth, tomorrow);
+    const monthStats = await calculateStats(startOfMonth, endOfMonth);
 
     // All sales
     const allSalesStats = await calculateStats(new Date('2000-01-01'));
