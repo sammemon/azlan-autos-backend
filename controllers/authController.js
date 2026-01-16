@@ -277,6 +277,60 @@ exports.updateUserStatus = async (req, res, next) => {
     }
 
     successResponse(res, 200, 'User status updated successfully', user);
+
+  // @desc    Google Sign-Up
+  // @route   POST /api/auth/google-signup
+  // @access  Public
+  exports.googleSignUp = async (req, res, next) => {
+    try {
+      const { email, name, phone, idToken } = req.body;
+
+      if (!email || !name || !phone || !idToken) {
+        return errorResponse(
+          res,
+          400,
+          'Missing required fields: email, name, phone, idToken'
+        );
+      }
+
+      // Check if user exists
+      let user = await User.findOne({ email });
+
+      if (user) {
+        // User exists - update phone if needed and generate token
+        if (!user.phone && phone) {
+          user.phone = phone;
+          await user.save();
+        }
+      } else {
+        // Create new user from Google signup
+        user = await User.create({
+          name,
+          email,
+          phone,
+          password: crypto.randomBytes(16).toString('hex'), // Random password for Google users
+          role: 'cashier',
+          isEmailVerified: true, // Auto-verify Google emails
+          googleId: idToken, // Store Google ID token for reference
+        });
+      }
+
+      // Generate JWT token
+      const token = generateToken(user._id);
+
+      successResponse(res, 201, 'Account created successfully with Google', {
+        token,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
   } catch (error) {
     next(error);
   }

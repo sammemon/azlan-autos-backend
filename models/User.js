@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Please provide an email'],
     unique: true,
     lowercase: true,
+      phone: {
+        type: String,
+      },
     trim: true,
   },
   password: {
@@ -40,6 +43,9 @@ const userSchema = new mongoose.Schema({
     type: String,
   },
   emailVerificationExpires: {
+      googleId: {
+        type: String,
+      },
     type: Date,
   },
 }, {

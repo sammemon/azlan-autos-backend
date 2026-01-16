@@ -13,6 +13,7 @@ const {
   signup,
   verifyEmail,
   resendVerification,
+  googleSignUp,
 } = require('../controllers/authController');
 
 router.post(
@@ -75,5 +76,17 @@ router.put(
 
 router.get('/users', protect, authorize('admin'), getAllUsers);
 router.put('/users/:id/status', protect, authorize('admin'), updateUserStatus);
+
+router.post(
+  '/google-signup',
+  [
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('name').notEmpty().withMessage('Name is required'),
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('idToken').notEmpty().withMessage('Google ID token is required'),
+  ],
+  validateRequest,
+  googleSignUp
+);
 
 module.exports = router;
