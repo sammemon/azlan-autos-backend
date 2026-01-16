@@ -13,7 +13,6 @@ const {
   signup,
   verifyEmail,
   resendVerification,
-  googleAuth,
 } = require('../controllers/authController');
 
 router.post(
@@ -37,8 +36,6 @@ router.post(
   validateRequest,
   resendVerification
 );
-
-router.post('/google', googleAuth);
 
 router.post(
   '/register',
