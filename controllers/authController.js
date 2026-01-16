@@ -9,6 +9,9 @@ exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
 
+    const allowedRoles = ['admin', 'developer', 'user'];
+    const safeRole = allowedRoles.includes(role) ? role : 'user';
+
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -20,7 +23,7 @@ exports.register = async (req, res, next) => {
       name,
       email,
       password,
-      role,
+      role: safeRole,
     });
 
     const token = generateToken(user._id);

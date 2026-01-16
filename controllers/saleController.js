@@ -10,12 +10,35 @@ const generateInvoiceNumber = async () => {
   return `INV-${String(lastNumber + 1).padStart(6, '0')}`;
 };
 
+// Ensure a single Walk-In customer exists and return it
+const getOrCreateWalkInCustomer = async () => {
+  const phone = '03213498203';
+  const name = 'Walk-In';
+
+  const existing = await Customer.findOne({
+    $or: [
+      { phone },
+      { name: { $regex: /^walk-in$/i } },
+    ],
+  });
+  if (existing) return existing;
+
+  return Customer.create({
+    name,
+    phone,
+  });
+};
+
 // @desc    Create sale
 // @route   POST /api/sales
 // @access  Private
 exports.createSale = async (req, res, next) => {
   try {
     const { customer, items, discount, tax, paymentMethod, amountPaid, notes } = req.body;
+
+    // Always attach Walk-In customer if none provided
+    const walkInCustomer = await getOrCreateWalkInCustomer();
+    const customerId = customer || walkInCustomer._id;
 
     // Calculate totals
     let subtotal = 0;
@@ -58,7 +81,7 @@ exports.createSale = async (req, res, next) => {
 
     const sale = await Sale.create({
       invoiceNumber,
-      customer,
+      customer: customerId,
       items: saleItems,
       subtotal,
       discount: discount || 0,
@@ -74,9 +97,9 @@ exports.createSale = async (req, res, next) => {
     });
 
     // Update customer if provided
-    if (customer) {
-      await Customer.findByIdAndUpdate(customer, {
-        $inc: { totalPurchases: total, totalPayments: amountPaid || total, pendingBalance: pendingAmount }
+    if (customerId) {
+      await Customer.findByIdAndUpdate(customerId, {
+        $inc: { totalPurchases: total, totalPayments: amountPaid || total, pendingBalance: pendingAmount },
       });
     }
 
@@ -109,6 +132,43 @@ exports.getAllSales = async (req, res, next) => {
       .populate('customer')
       .populate('cashier', 'name')
       .sort({ saleDate: -1 });
+
+    // Backfill old sales that missed a customer by linking them to Walk-In
+    const orphanedSales = sales.filter((s) => !s.customer);
+    if (orphanedSales.length) {
+      console.log(`BACKFILL: Found ${orphanedSales.length} orphaned sales without customer`);
+      const walkInCustomer = await getOrCreateWalkInCustomer();
+      console.log(`BACKFILL: Walk-In customer ID: ${walkInCustomer._id}`);
+
+      // Update all orphaned sales to link to Walk-In
+      const updateResult = await Sale.updateMany(
+        { _id: { $in: orphanedSales.map((s) => s._id) } },
+        { customer: walkInCustomer._id },
+      );
+      console.log(`BACKFILL: Updated ${updateResult.modifiedCount} sales with Walk-In customer`);
+
+      // Update Walk-In customer totals with orphaned sales amounts
+      const orphanedTotals = orphanedSales.reduce(
+        (acc, s) => ({
+          totalPurchases: acc.totalPurchases + (s.total || 0),
+          totalPayments: acc.totalPayments + (s.amountPaid || 0),
+          pendingBalance: acc.pendingBalance + (s.pendingAmount || 0),
+        }),
+        { totalPurchases: 0, totalPayments: 0, pendingBalance: 0 }
+      );
+
+      await Customer.findByIdAndUpdate(walkInCustomer._id, {
+        $inc: orphanedTotals,
+      });
+      console.log(`BACKFILL: Updated Walk-In totals: ${JSON.stringify(orphanedTotals)}`);
+
+      // Re-fetch to return populated customers after backfill
+      const refreshedSales = await Sale.find(query)
+        .populate('customer')
+        .populate('cashier', 'name')
+        .sort({ saleDate: -1 });
+      return successResponse(res, 200, 'Sales retrieved successfully', refreshedSales);
+    }
 
     successResponse(res, 200, 'Sales retrieved successfully', sales);
   } catch (error) {
